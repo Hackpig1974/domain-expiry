@@ -3,8 +3,8 @@ Homepage Service to allow for domain expiration Lookups
 
 <img width="549" height="239" alt="image" src="https://github.com/user-attachments/assets/60a00162-1584-4e2e-981f-5c0e30626224" />
 
-Screenshot
--I set the .env file to 305 to trigger the red expiration orb for the screenshot.-
+(Screenshot of it in action)
+I set the .env file to 305 to trigger the red expiration orb for the screenshot.
 
 I created this custom service which allows for monitoring of domain names so that you know when they are coming up for expiration. This uses a docker container that runs locally (Not from a repository) that quereis at an interval that you set, and then makes the data available so that homepage can query that output to display as a service. If a domain is in need of renewal within so many days, it will put a Red orb in front of that domain entry to let you know, and bring attention to, that the domain is going to expire soon.
 
