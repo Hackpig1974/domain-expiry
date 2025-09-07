@@ -14,8 +14,10 @@ I find myself using Homepage daily, and this is just an easy way to know that I 
 
 === Full instructions: ===
 1) Make the project
+```Yaml
 sudo mkdir -p /your/container/path/domain-expiry
 cd /your/container/path/domain-expiry
+```
 
 2) Create .env (edit the domain list + alert window)
 ```Yaml
