@@ -1,6 +1,11 @@
 # domain-expiry
 Homepage Service to allow for domain expiration Lookups
 
+<img width="549" height="239" alt="image" src="https://github.com/user-attachments/assets/60a00162-1584-4e2e-981f-5c0e30626224" />
+
+Screenshot
+-I set the .env file to 305 to trigger the red expiration orb for the screenshot.-
+
 I created this custom service which allows for monitoring of domain names so that you know when they are coming up for expiration. This uses a docker container that runs locally (Not from a repository) that quereis at an interval that you set, and then makes the data available so that homepage can query that output to display as a service. If a domain is in need of renewal within so many days, it will put a Red orb in front of that domain entry to let you know, and bring attention to, that the domain is going to expire soon.
 
 I find myself using Homepage daily, and this is just an easy way to know that I have domain renewals coming due soon. This consists of one new docker container and an edit to your homepage/config/services.yaml file.
@@ -226,5 +231,8 @@ In config/services.yaml:
 ``` Yaml
 docker compose -f /your/container/path/homepage/docker-compose.yml up -d
 ```
+
+Hope you enjoy it. 
+-HackPig
 
       
