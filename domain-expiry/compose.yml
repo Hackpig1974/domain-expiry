@@ -1,0 +1,15 @@
+services:
+  domain-expiry:
+    build: .
+    container_name: domain-expiry
+    env_file: .env    # loads DOMAINS/ALERT_DAYS/RDAP_BASE/TZ into the container from the .env file
+    environment:
+      - TZ=${TZ}
+    ports:
+      - "8088:8000"          
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/healthz || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
