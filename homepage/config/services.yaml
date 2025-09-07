@@ -1,0 +1,12 @@
+- Domain Tools:
+    - Domain Expirations:
+        icon: mdi-web
+        widget:
+          type: customapi
+          url: http://192.168.100.23:8088/status   # This required the hardcoded IP of your docker server where the apps run
+          display: dynamic-list
+          refreshInterval: 900000  # 15 min
+          mappings:
+            items: domains
+            name: domain
+            label: label            # shows "🔴 MM/DD/YYYY (Xd)" when <= ALERT_DAYS
