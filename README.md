@@ -1,4 +1,4 @@
-# 🌐 Domain Expiry Monitor for Homepage
+# 🌐 Domain Expiration Monitor for Homepage
 
 A beautiful domain expiration monitoring service for [Homepage](https://gethomepage.dev/) dashboard that tracks your domain renewals and alerts you before they expire.
 
