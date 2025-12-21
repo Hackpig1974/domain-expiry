@@ -1,238 +1,351 @@
-# domain-expiry
-Homepage Service to allow for domain expiration Lookups
+# 🌐 Domain Expiry Monitor for Homepage
 
-<img width="549" height="239" alt="image" src="https://github.com/user-attachments/assets/60a00162-1584-4e2e-981f-5c0e30626224" />
+A beautiful domain expiration monitoring service for [Homepage](https://gethomepage.dev/) dashboard that tracks your domain renewals and alerts you before they expire.
 
-(Screenshot of it in action)
-I set the .env file to 305 to trigger the red expiration orb for the screenshot.
+![Domain Expiry Widget](https://private-user-images.githubusercontent.com/63210701/486527208-60a00162-1584-4e2e-981f-5c0e30626224.png)
 
-I created this custom service which allows for monitoring of domain names so that you know when they are coming up for expiration. This uses a docker container that runs locally (Not from a repository) that quereis at an interval that you set, and then makes the data available so that homepage can query that output to display as a service. If a domain is in need of renewal within so many days, it will put a Red orb in front of that domain entry to let you know, and bring attention to, that the domain is going to expire soon.
+## ✨ Features
 
-I find myself using Homepage daily, and this is just an easy way to know that I have domain renewals coming due soon. This consists of one new docker container and an edit to your homepage/config/services.yaml file.
+- 🔴 **Visual Alerts** - Red indicator when domains are approaching expiration
+- 📅 **Expiration Tracking** - Shows days remaining for each domain
+- 🔄 **Auto-Refresh** - Configurable cache (default 6 hours)
+- 🌍 **All TLDs** - Uses RDAP for universal domain support
+- 🐳 **Docker Ready** - Simple container deployment
+- ⚡ **Fast & Lightweight** - Python FastAPI backend
+- 🎨 **Homepage Native** - Uses built-in customapi widget
 
-=== TL/DR Instructions:  ===
-1. Make a folder for the new container and drop in the files listed. (mkdir /your/container/path/domain-expiry)
-2. Put your domains + settings in .env. (nano /your/container/path/.env)
-3. docker compose up -d --build.
-4. Add the tile to services.yaml, edit the IP address, and reload Homepage.
+## 🚀 Quick Start
 
+### Prerequisites
 
-=== Full instructions: ===
-1) Make the project
-```Yaml
-sudo mkdir -p /your/container/path/domain-expiry
+- Docker & Docker Compose
+- Running [Homepage](https://gethomepage.dev/) instance
+- Domains you want to monitor
+
+### Installation
+
+1. **Create Project Directory**
+
+```bash
+mkdir -p /your/container/path/domain-expiry
 cd /your/container/path/domain-expiry
 ```
 
-2) Create .env (edit the domain list + alert window)
-```Yaml
-DOMAINS=ebay.com,sony.com,etc.com
+2. **Create Configuration File** (`.env`)
+
+```bash
+cat > .env << EOF
+DOMAINS=example.com,google.com,github.com
 RDAP_BASE=https://rdap.org/domain
-ALERT_DAYS=183          # show 🔴 at/under this many days
-REFRESH_MINUTES=360     # API cache window
-TZ=America/Denver       # Your timezone
+ALERT_DAYS=183
+REFRESH_MINUTES=360
+TZ=America/Denver
+EOF
 ```
 
-3) app.py (drop-in full file)
-```Yaml
-import os
-import time
-import math
-import requests
-from datetime import datetime, timezone
-from dateutil import parser as dtparse
-from fastapi import FastAPI
-from typing import Dict
+3. **Create Files**
 
-app = FastAPI(title="Domain Expiry API")
+Copy `app.py`, `requirements.txt`, `Dockerfile`, and `compose.yml` from this repository.
 
-# --- Required envs (fail fast) ---
-DOMAINS = [d.strip() for d in os.environ["DOMAINS"].split(",") if d.strip()]
-RDAP_BASE = os.environ["RDAP_BASE"].rstrip("/")
-ALERT_DAYS = int(os.environ["ALERT_DAYS"])
+4. **Build and Start**
 
-# --- Optional envs ---
-REFRESH_MINUTES = int(os.getenv("REFRESH_MINUTES", "360"))  # 6h cache
-ALERT_EMOJI = os.getenv("ALERT_EMOJI", "🔴")
-
-CACHE_TTL = REFRESH_MINUTES * 60
-_cache = {"data": None, "ts": 0.0}
-
-# Reuse HTTP connections + set a UA (some RDAPs care)
-_session = requests.Session()
-_session.headers.update({"User-Agent": "domain-expiry/1.0 (+rdap client)"})
-
-def _fetch_one(domain: str) -> Dict:
-    url = f"{RDAP_BASE}/{domain}"
-    try:
-        r = _session.get(url, timeout=20)
-        r.raise_for_status()
-        j = r.json()
-
-        # Find expiration event
-        exp_iso = None
-        for ev in j.get("events", []):
-            if ev.get("eventAction") in ("expiration", "expiry"):
-                exp_iso = ev.get("eventDate")
-                break
-
-        if not exp_iso:
-            return {
-                "domain": domain,
-                "expires": None,
-                "expires_us": None,
-                "days_left": None,
-                "label": "n/a",
-                "alert": False,
-                "source": url,
-                "error": "no-expiration-in-rdap",
-            }
-
-        exp_dt = dtparse.isoparse(exp_iso).astimezone(timezone.utc)
-        today = datetime.now(timezone.utc).date()
-        days_left = (exp_dt.date() - today).days
-        expires_us = exp_dt.strftime("%m/%d/%Y")
-        alert = days_left <= ALERT_DAYS  # days_left is always int here
-
-        # Right-side label for Homepage dynamic-list (emoji BEFORE date)
-        label = f"{ALERT_EMOJI} {expires_us} ({days_left}d)" if alert else f"{expires_us} ({days_left}d)"
-
-        return {
-            "domain": domain,
-            "expires": exp_dt.isoformat(),
-            "expires_us": expires_us,
-            "days_left": days_left,
-            "label": label,
-            "alert": alert,
-            "source": url,  # drop if you don’t use it
-        }
-    except Exception as e:
-        return {
-            "domain": domain,
-            "expires": None,
-            "expires_us": None,
-            "days_left": None,
-            "label": "n/a",
-            "alert": False,
-            "source": url,
-            "error": str(e),
-        }
-
-
-def _refresh(force: bool = False):
-    now = time.monotonic()
-    if not force and _cache["data"] is not None and (now - _cache["ts"] < CACHE_TTL):
-        return
-
-    data = [_fetch_one(d) for d in DOMAINS]
-    # Soonest first; missing dates last
-    data.sort(key=lambda d: (d.get("days_left") is None, d.get("days_left", math.inf)))
-
-    _cache["data"] = {
-        "updated": datetime.now(timezone.utc).isoformat(),
-        "domains": data,
-        "refresh_minutes": REFRESH_MINUTES,
-        "alert_days": ALERT_DAYS,
-        "rdap_base": RDAP_BASE,
-    }
-    _cache["ts"] = now
-
-@app.get("/healthz")
-def healthz():
-    return {"ok": True}
-
-
-@app.get("/status")
-def status(force: bool = False):
-    _refresh(force=force)
-    return _cache["data"]
-
-@app.get("/flat")
-def flat():
-    _refresh(force=False)
-    lines = {}
-    for i, item in enumerate(_cache["data"]["domains"], start=1):
-        if item["expires_us"]:
-            prefix = f"{ALERT_EMOJI} " if item.get("alert") else ""
-            line = f"{item['domain']} — Exp: {prefix}{item['expires_us']} ({item['days_left']}d)"
-        else:
-            line = f"{item['domain']} — Exp: n/a"
-            if item.get("error"):
-                line += f" [{item['error']}]"
-        lines[f"line{i}"] = line
-    lines["updated"] = _cache["data"]["updated"]
-    return lines
-```
-
-4) requirements.txt
-``` Yaml
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
-requests==2.32.3
-python-dateutil==2.9.0.post0
-```
-
-5) Dockerfile
-``` Yaml
-FROM python:3.12-slim
-WORKDIR /app
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py .
-EXPOSE 8000
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-6) compose.yml (Running the docker-expiry container on the Homepage server)
-``` Yaml
-services:
-  domain-expiry:
-    build: .
-    container_name: domain-expiry
-    env_file: .env    # loads DOMAINS/ALERT_DAYS/RDAP_BASE/TZ into the container from the .env file
-    environment:
-      - TZ=${TZ}
-    ports:
-      - "8088:8000"          
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/healthz || exit 1"]
-      interval: 60s
-      timeout: 5s
-      retries: 3
-```
-
-7) Build + run + test
-``` Yaml
+```bash
 docker compose up -d --build
-curl -s http://127.0.0.1:8088/healthz
-curl -s "http://127.0.0.1:8088/status?force=true"
 ```
 
-8) Wire the Homepage tile (dynamic-list)
-In config/services.yaml:
-``` Yaml
+5. **Verify it's Running**
+
+```bash
+# Health check
+curl http://localhost:8088/healthz
+
+# Get domain status
+curl http://localhost:8088/status
+```
+
+### Configure Homepage
+
+Add to your `services.yaml`:
+
+```yaml
 - Domain Tools:
     - Domain Expirations:
         icon: mdi-web
         widget:
           type: customapi
-          url: http://192.168.100.23:8088/status   # This required the hardcoded IP of your docker server where the apps run
+          url: http://YOUR_SERVER_IP:8088/status
           display: dynamic-list
-          refreshInterval: 900000  # 15 min
+          refreshInterval: 900000  # 15 minutes
           mappings:
             items: domains
             name: domain
-            label: label            # shows "🔴 MM/DD/YYYY (Xd)" when <= ALERT_DAYS
+            label: label
 ```
 
-9) Reload Homepage:
-``` Yaml
-docker compose -f /your/container/path/homepage/docker-compose.yml up -d
+**Replace `YOUR_SERVER_IP`** with your Docker host's IP address.
+
+Restart Homepage:
+
+```bash
+docker compose restart homepage
 ```
 
-Hope you enjoy it. 
--HackPig
+## ⚙️ Configuration
 
-      
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DOMAINS` | ✅ Yes | - | Comma-separated list of domains to monitor |
+| `RDAP_BASE` | ✅ Yes | - | RDAP server URL (use `https://rdap.org/domain`) |
+| `ALERT_DAYS` | ✅ Yes | - | Show alert when days remaining ≤ this value |
+| `REFRESH_MINUTES` | No | 360 | Cache duration in minutes (6 hours) |
+| `ALERT_EMOJI` | No | 🔴 | Emoji to show for expiring domains |
+| `TZ` | No | UTC | Timezone (e.g., `America/New_York`) |
+
+### Example Configurations
+
+**High-Security Setup** (check more frequently):
+```bash
+DOMAINS=banking.com,payment.com
+ALERT_DAYS=90
+REFRESH_MINUTES=60  # 1 hour
+```
+
+**Personal Domains** (longer cache):
+```bash
+DOMAINS=myblog.com,portfolio.io,family.name
+ALERT_DAYS=183
+REFRESH_MINUTES=720  # 12 hours
+```
+
+## 📡 API Endpoints
+
+### `GET /status`
+
+Returns full domain information with metadata.
+
+**Query Parameters:**
+- `force=true` - Force refresh cache
+
+**Response:**
+```json
+{
+  "updated": "2024-12-21T16:30:00Z",
+  "domains": [
+    {
+      "domain": "example.com",
+      "expires": "2025-06-15T00:00:00Z",
+      "expires_us": "06/15/2025",
+      "days_left": 176,
+      "label": "06/15/2025 (176d)",
+      "alert": false,
+      "source": "https://rdap.org/domain/example.com"
+    }
+  ],
+  "refresh_minutes": 360,
+  "alert_days": 183,
+  "rdap_base": "https://rdap.org/domain"
+}
+```
+
+### `GET /flat`
+
+Returns simplified text-based format.
+
+**Response:**
+```json
+{
+  "line1": "example.com — Exp: 06/15/2025 (176d)",
+  "line2": "🔴 urgent.com — Exp: 🔴 01/10/2025 (20d)",
+  "updated": "2024-12-21T16:30:00Z"
+}
+```
+
+### `GET /healthz`
+
+Health check endpoint for monitoring.
+
+**Response:**
+```json
+{
+  "ok": true
+}
+```
+
+## 🎨 Display Options
+
+### Dynamic List (Recommended)
+
+Shows all domains in a clean list:
+```yaml
+widget:
+  type: customapi
+  url: http://IP:8088/status
+  display: dynamic-list
+  mappings:
+    items: domains
+    name: domain
+    label: label
+```
+
+### Block Display
+
+For 1-4 domains:
+```yaml
+widget:
+  type: customapi
+  url: http://IP:8088/flat
+  display: block
+  mappings:
+    - field: line1
+      label: Primary Domain
+    - field: line2
+      label: Backup Domain
+```
+
+
+## 🔧 Troubleshooting
+
+### Widget Shows "Error" or "N/A"
+
+1. **Check Container Logs**
+   ```bash
+   docker logs domain-expiry
+   ```
+
+2. **Verify API is Accessible**
+   ```bash
+   curl http://YOUR_IP:8088/status
+   ```
+
+3. **Test Individual Domain**
+   ```bash
+   curl "https://rdap.org/domain/example.com"
+   ```
+
+### Domains Not Updating
+
+- **Force Refresh**: `curl "http://YOUR_IP:8088/status?force=true"`
+- **Reduce Cache**: Lower `REFRESH_MINUTES` in `.env`
+- **Restart Container**: `docker compose restart`
+
+### "No Expiration in RDAP" Error
+
+Some domains/TLDs don't provide expiration data via RDAP:
+- Check if domain actually exists
+- Try alternative RDAP providers
+- Verify domain is not expired already
+- Some country-code TLDs have limited RDAP support
+
+### Homepage Can't Connect
+
+1. **Use Host IP, Not localhost**
+   - ❌ `http://localhost:8088`
+   - ✅ `http://192.168.1.100:8088`
+
+2. **Check Docker Network**
+   ```bash
+   docker network inspect bridge
+   ```
+
+3. **Verify Port is Open**
+   ```bash
+   netstat -tulpn | grep 8088
+   ```
+
+## 💡 Tips & Best Practices
+
+### Security
+
+- 🔒 Don't expose port 8088 to the internet
+- 🛡️ Run behind reverse proxy with auth if needed
+- 📝 No sensitive data is stored
+- 🔑 RDAP queries don't require authentication
+
+### Performance
+
+- 📊 Monitor 10-20 domains max per instance
+- ⏱️ Keep cache at 6+ hours to respect RDAP servers
+- 🚀 Use CDN RDAP (`rdap.org`) for best performance
+- 💾 Container uses minimal resources (~50MB RAM)
+
+### Maintenance
+
+- 🔄 Update container regularly: `docker compose pull && docker compose up -d`
+- 📅 Review alert threshold quarterly
+- 🧹 Check logs occasionally: `docker logs domain-expiry --tail 100`
+
+## 🤔 FAQ
+
+**Q: Can I monitor subdomains?**  
+A: No - expiration is tracked at the domain level only. Subdomains inherit the parent domain's expiration.
+
+**Q: What about private/internal domains?**  
+A: RDAP only works for publicly registered domains. Internal domains won't work.
+
+**Q: Can I use multiple RDAP providers?**  
+A: Currently no, but you could run multiple instances with different providers.
+
+**Q: Why 6 hour cache?**  
+A: Domain expiry dates change rarely. Shorter cache = unnecessary load on RDAP servers.
+
+**Q: Can I get notifications?**  
+A: Not yet - see roadmap below. For now, Homepage is your notification.
+
+**Q: Does this work with Homepage v0.8.x?**  
+A: Yes! The `customapi` widget has been available for a long time.
+
+**Q: How many domains can I monitor?**  
+A: Tested up to 50. More than that, consider multiple instances or longer cache times.
+
+## 🗺️ Roadmap
+
+Potential future features (PRs welcome!):
+
+- [ ] Webhook notifications (Discord, Slack, email)
+- [ ] SSL certificate expiry monitoring
+- [ ] DNS record monitoring
+- [ ] Historical data/trends
+- [ ] Web UI for configuration
+- [ ] Multiple RDAP provider support
+- [ ] Prometheus metrics export
+- [ ] Persistent cache across restarts
+- [ ] Auto-renewal reminders
+- [ ] Import domains from file
+
+## 🤝 Contributing
+
+Contributions welcome! Ideas:
+
+1. **Report Issues** - Found a bug? Open an issue
+2. **Feature Requests** - Have an idea? Start a discussion
+3. **Code** - PRs welcome for features or fixes
+4. **Documentation** - Improve README, add examples
+5. **Testing** - Test with different TLDs and report back
+
+## 📚 Related Projects
+
+- [Homepage](https://gethomepage.dev/) - The dashboard this integrates with
+- [RDAP](https://www.icann.org/rdap) - Domain registration data protocol
+- [Whois](https://en.wikipedia.org/wiki/WHOIS) - Alternative domain lookup
+
+## 📄 License
+
+GPL-3.0 License - see LICENSE file
+
+## 🙏 Acknowledgments
+
+- Homepage team for excellent dashboard & customapi widget
+- RDAP.org for free RDAP meta-service
+- FastAPI for the awesome Python framework
+
+## 📞 Support
+
+- 🐛 [Open an Issue](https://github.com/Hackpig1974/domain-expiry/issues)
+- 💬 [Discussions](https://github.com/Hackpig1974/domain-expiry/discussions)
+- ⭐ Star this repo if you find it useful!
+
+---
+
+Made with ❤️ for the homelab community

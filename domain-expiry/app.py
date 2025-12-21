@@ -55,7 +55,7 @@ def _fetch_one(domain: str) -> Dict:
         today = datetime.now(timezone.utc).date()
         days_left = (exp_dt.date() - today).days
         expires_us = exp_dt.strftime("%m/%d/%Y")
-        alert = days_left <= ALERT_DAYS  # days_left is always int here
+        alert = days_left <= ALERT_DAYS
 
         # Right-side label for Homepage dynamic-list (emoji BEFORE date)
         label = f"{ALERT_EMOJI} {expires_us} ({days_left}d)" if alert else f"{expires_us} ({days_left}d)"
@@ -67,7 +67,7 @@ def _fetch_one(domain: str) -> Dict:
             "days_left": days_left,
             "label": label,
             "alert": alert,
-            "source": url,  # drop if you don’t use it
+            "source": url,
         }
     except Exception as e:
         return {
@@ -80,6 +80,7 @@ def _fetch_one(domain: str) -> Dict:
             "source": url,
             "error": str(e),
         }
+
 
 def _refresh(force: bool = False):
     now = time.monotonic()
@@ -102,6 +103,7 @@ def _refresh(force: bool = False):
 @app.get("/healthz")
 def healthz():
     return {"ok": True}
+
 
 @app.get("/status")
 def status(force: bool = False):
