@@ -2,7 +2,7 @@
 
 A beautiful domain expiration monitoring service for [Homepage](https://gethomepage.dev/) dashboard that tracks your domain renewals and alerts you before they expire.
 
-![Domain Expiry Widget](https://private-user-images.githubusercontent.com/63210701/486527208-60a00162-1584-4e2e-981f-5c0e30626224.png)
+![Domain Expiry Widget](screenshot.png)
 
 ## ✨ Features
 
