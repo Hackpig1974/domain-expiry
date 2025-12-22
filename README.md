@@ -102,6 +102,9 @@ docker compose restart homepage
 | `REFRESH_MINUTES` | No | 360 | Cache duration in minutes (6 hours) |
 | `ALERT_EMOJI` | No | 🔴 | Emoji to show for expiring domains |
 | `TZ` | No | UTC | Timezone (e.g., `America/New_York`) |
+| `WHOIS_FALLBACK_ENABLED` | No | false | Fallback to WHOIS when RDAP fails (for ccTLDs) |
+
+> **Note:** `WHOIS_FALLBACK_ENABLED` is useful for country-code TLDs (ccTLDs) that don't fully support RDAP yet. When enabled, the service will attempt a WHOIS lookup if RDAP fails. WHOIS is slower and being phased out globally, so this is intended as a temporary workaround.
 
 ### Example Configurations
 
@@ -233,10 +236,21 @@ widget:
 ### "No Expiration in RDAP" Error
 
 Some domains/TLDs don't provide expiration data via RDAP:
-- Check if domain actually exists
-- Try alternative RDAP providers
-- Verify domain is not expired already
-- Some country-code TLDs have limited RDAP support
+
+**Solution: Enable WHOIS Fallback**
+1. Add to your `.env` file:
+   ```bash
+   WHOIS_FALLBACK_ENABLED=true
+   ```
+2. Restart container: `docker compose restart`
+3. Check logs: `docker logs domain-expiry`
+
+This is particularly useful for:
+- Country-code TLDs (ccTLDs) like `.bz`, `.ai`, `.io` that haven't fully adopted RDAP
+- Legacy domains on older registries
+- Domains transitioning to RDAP support
+
+**Note:** WHOIS lookups are slower and less reliable than RDAP. This is intended as a temporary workaround while global RDAP adoption continues.
 
 ### Homepage Can't Connect
 
