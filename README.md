@@ -90,7 +90,7 @@ Restart Homepage:
 docker compose restart homepage
 ```
 
-## ⚙️ Configuration
+## ⚙️ Configuration (This is the section that goes in your .env file. See the example provided)
 
 ### Environment Variables
 
