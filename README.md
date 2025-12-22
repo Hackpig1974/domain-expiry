@@ -9,55 +9,79 @@ A beautiful domain expiration monitoring service for [Homepage](https://gethomep
 - 🔴 **Visual Alerts** - Red indicator when domains are approaching expiration
 - 📅 **Expiration Tracking** - Shows days remaining for each domain
 - 🔄 **Auto-Refresh** - Configurable cache (default 6 hours)
-- 🌍 **All TLDs** - Uses RDAP for universal domain support
-- 🐳 **Docker Ready** - Simple container deployment
+- 🌍 **All TLDs** - 3-tier fallback system supports 7,500+ TLDs worldwide
+- 🐳 **Docker Ready** - Available as pre-built package on GHCR
 - ⚡ **Fast & Lightweight** - Python FastAPI backend
 - 🎨 **Homepage Native** - Uses built-in customapi widget
 
-## 🚀 Quick Start
+---
+
+## 🚀 Installation
 
 ### Prerequisites
 
-- Docker & Docker Compose
+- Docker & Docker Compose installed
 - Running [Homepage](https://gethomepage.dev/) instance
 - Domains you want to monitor
 
-### Installation
+---
 
-1. **Create Project Directory**
+### Method 1: Docker Compose (Recommended)
 
+**Step 1: Create Container Directory**
 ```bash
-mkdir -p /your/container/path/domain-expiry
-cd /your/container/path/domain-expiry
+mkdir -p /path/to/containers/domain-expiry
+cd /path/to/containers/domain-expiry
 ```
 
-2. **Create Configuration File** (`.env`)
+**Step 2: Download compose.yml**
+
+Download the [`compose.yml`](https://raw.githubusercontent.com/Hackpig1974/domain-expiry/main/domain-expiry/compose.yml) file:
 
 ```bash
-cat > .env << EOF
+wget https://raw.githubusercontent.com/Hackpig1974/domain-expiry/main/domain-expiry/compose.yml
+# or
+curl -O https://raw.githubusercontent.com/Hackpig1974/domain-expiry/main/domain-expiry/compose.yml
+```
+
+**Step 3: Pull the Docker Image**
+```bash
+docker pull ghcr.io/hackpig1974/domain-expiry:latest
+```
+
+**Step 4: Create Configuration File**
+
+Download the example and rename it:
+```bash
+wget https://raw.githubusercontent.com/Hackpig1974/domain-expiry/main/domain-expiry/.env.example -O .env
+```
+
+Or create `.env` manually:
+```bash
+nano .env
+```
+
+Add your configuration:
+```env
 DOMAINS=example.com,google.com,github.com
 RDAP_BASE=https://rdap.org/domain
+WHOIS_FALLBACK_ENABLED=false
+WHOISXML_API_KEY=
 ALERT_DAYS=183
 REFRESH_MINUTES=360
 TZ=America/Denver
-WHOIS_FALLBACK_ENABLED=false
-WHOISXML_API_KEY=YOUR API KEY
-EOF
 ```
 
-3. **Create Files**
-
-Copy `app.py`, `requirements.txt`, `Dockerfile`, and `compose.yml` from this repository.
-
-4. **Build and Start**
-
+**Step 5: Start the Container**
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
-5. **Verify it's Running**
-
+**Step 6: Verify it's Running**
 ```bash
+# Check container status
+docker ps | grep domain-expiry
+
 # Health check
 curl http://localhost:8088/healthz
 
@@ -65,9 +89,129 @@ curl http://localhost:8088/healthz
 curl http://localhost:8088/status
 ```
 
-### Configure Homepage
+---
 
-Add to your `services.yaml`:
+### Method 2: Docker CLI (Native Command Line)
+
+**Step 1: Create Container Directory**
+```bash
+mkdir -p /path/to/containers/domain-expiry
+cd /path/to/containers/domain-expiry
+```
+
+**Step 2: Pull the Docker Image**
+```bash
+docker pull ghcr.io/hackpig1974/domain-expiry:latest
+```
+
+**Step 3: Create Configuration File**
+
+Download the example:
+```bash
+wget https://raw.githubusercontent.com/Hackpig1974/domain-expiry/main/domain-expiry/.env.example -O .env
+```
+
+Edit with your settings:
+```bash
+nano .env
+```
+
+**Step 4: Run the Container**
+```bash
+docker run -d \
+  --name domain-expiry \
+  --env-file .env \
+  -p 8088:8000 \
+  --restart unless-stopped \
+  ghcr.io/hackpig1974/domain-expiry:latest
+```
+
+**Step 5: Verify it's Running**
+```bash
+# Check container status
+docker ps | grep domain-expiry
+
+# View logs
+docker logs domain-expiry
+
+# Health check
+curl http://localhost:8088/healthz
+
+# Get domain status
+curl http://localhost:8088/status
+```
+
+---
+
+### 🔄 Updating
+
+**Docker Compose:**
+```bash
+cd /path/to/containers/domain-expiry
+docker compose pull
+docker compose up -d
+```
+
+**Docker CLI:**
+```bash
+docker pull ghcr.io/hackpig1974/domain-expiry:latest
+docker stop domain-expiry
+docker rm domain-expiry
+# Re-run the docker run command from Step 4 above
+```
+
+---
+
+### 🐛 Troubleshooting Installation
+
+**Container won't start:**
+```bash
+# Check logs
+docker logs domain-expiry
+
+# Common issues:
+# - Missing required .env variables (DOMAINS, RDAP_BASE, ALERT_DAYS)
+# - Port 8088 already in use (change to different port)
+# - Invalid domain format in DOMAINS variable
+```
+
+**Can't access the API:**
+```bash
+# Verify container is running
+docker ps | grep domain-expiry
+
+# Check if port is accessible
+curl http://localhost:8088/healthz
+
+# If using a different host, replace localhost with server IP
+curl http://YOUR_SERVER_IP:8088/healthz
+```
+
+**Domains showing "n/a":**
+```bash
+# Check logs for specific errors
+docker logs domain-expiry -f
+
+# Force refresh cache
+curl "http://localhost:8088/status?force=true"
+
+# See Configuration section for fallback options
+```
+
+---
+
+## 📊 Configure Homepage Dashboard
+
+Once the container is running, add it to your Homepage dashboard:
+
+**Step 1: Edit Homepage services.yaml**
+
+```bash
+# Location depends on your Homepage setup
+nano /path/to/homepage/config/services.yaml
+```
+
+**Step 2: Add Domain Expiry Widget**
 
 ```yaml
 - Domain Tools:
@@ -77,22 +221,71 @@ Add to your `services.yaml`:
           type: customapi
           url: http://YOUR_SERVER_IP:8088/status
           display: dynamic-list
-          refreshInterval: 900000  # 15 minutes
+          refreshInterval: 900000  # 15 minutes (in milliseconds)
           mappings:
             items: domains
             name: domain
             label: label
 ```
 
-**Replace `YOUR_SERVER_IP`** with your Docker host's IP address.
+**Important:** Replace `YOUR_SERVER_IP` with:
+- Docker host IP address (e.g., `192.168.1.100`) if Homepage is in a different container
+- `localhost` or `127.0.0.1` if Homepage is on the same host
+- Container name `domain-expiry` if on the same Docker network
 
-Restart Homepage:
+**Step 3: Restart Homepage**
 
 ```bash
+# If using Docker Compose
 docker compose restart homepage
+
+# If using Docker CLI
+docker restart homepage
 ```
 
-## ⚙️ Configuration (This is the section that goes in your .env file. See the example provided)
+**Step 4: Verify Widget Appears**
+
+The widget should now show:
+- List of domains being monitored
+- Expiration dates in MM/DD/YYYY format
+- Days remaining in parentheses
+- 🔴 Red alert emoji for domains expiring soon (within ALERT_DAYS threshold)
+
+**Example Widget Display:**
+```
+Domain Expirations
+├─ example.com — Exp: 🔴 01/15/2026 (23d)
+├─ google.com — Exp: 09/14/2028 (997d)
+└─ github.com — Exp: 10/09/2025 (291d)
+```
+
+---
+
+### Alternative: Flat Format Widget
+
+If you prefer a simpler list format:
+
+```yaml
+- Domain Tools:
+    - Domain Expirations:
+        icon: mdi-web
+        widget:
+          type: customapi
+          url: http://YOUR_SERVER_IP:8088/flat
+          display: list
+          refreshInterval: 900000
+          mappings:
+            - field: line1
+            - field: line2
+            - field: line3
+            # Add more lines as needed for each domain
+```
+
+This displays domains in a cleaner line-by-line format without JSON parsing.
+
+---
+
+## ⚙️ Configuration
 
 ### Environment Variables
 
@@ -170,6 +363,8 @@ ALERT_DAYS=183
 REFRESH_MINUTES=720  # 12 hours
 ```
 
+---
+
 ## 📡 API Endpoints
 
 ### `GET /status`
@@ -191,7 +386,7 @@ Returns full domain information with metadata.
       "days_left": 176,
       "label": "06/15/2025 (176d)",
       "alert": false,
-      "source": "https://rdap.org/domain/example.com"
+      "source": "rdap"
     }
   ],
   "refresh_minutes": 360,
@@ -224,37 +419,7 @@ Health check endpoint for monitoring.
 }
 ```
 
-## 🎨 Display Options
-
-### Dynamic List (Recommended)
-
-Shows all domains in a clean list:
-```yaml
-widget:
-  type: customapi
-  url: http://IP:8088/status
-  display: dynamic-list
-  mappings:
-    items: domains
-    name: domain
-    label: label
-```
-
-### Block Display
-
-For 1-4 domains:
-```yaml
-widget:
-  type: customapi
-  url: http://IP:8088/flat
-  display: block
-  mappings:
-    - field: line1
-      label: Primary Domain
-    - field: line2
-      label: Backup Domain
-```
-
+---
 
 ## 🔧 Troubleshooting
 
@@ -335,6 +500,8 @@ This works without an API key but has limited TLD support.
    netstat -tulpn | grep 8088
    ```
 
+---
+
 ## 💡 Tips & Best Practices
 
 ### Security
@@ -356,6 +523,8 @@ This works without an API key but has limited TLD support.
 - 🔄 Update container regularly: `docker compose pull && docker compose up -d`
 - 📅 Review alert threshold quarterly
 - 🧹 Check logs occasionally: `docker logs domain-expiry --tail 100`
+
+---
 
 ## 🤔 FAQ
 
@@ -380,6 +549,8 @@ A: Yes! The `customapi` widget has been available for a long time.
 **Q: How many domains can I monitor?**  
 A: Tested up to 50. More than that, consider multiple instances or longer cache times.
 
+---
+
 ## 🗺️ Roadmap
 
 Potential future features (PRs welcome!):
@@ -395,6 +566,8 @@ Potential future features (PRs welcome!):
 - [ ] Auto-renewal reminders
 - [ ] Import domains from file
 
+---
+
 ## 🤝 Contributing
 
 Contributions welcome! Ideas:
@@ -405,21 +578,30 @@ Contributions welcome! Ideas:
 4. **Documentation** - Improve README, add examples
 5. **Testing** - Test with different TLDs and report back
 
+---
+
 ## 📚 Related Projects
 
 - [Homepage](https://gethomepage.dev/) - The dashboard this integrates with
 - [RDAP](https://www.icann.org/rdap) - Domain registration data protocol
-- [Whois](https://en.wikipedia.org/wiki/WHOIS) - Alternative domain lookup
+- [WhoisXML API](https://whoisxmlapi.com) - Universal WHOIS data provider
+
+---
 
 ## 📄 License
 
 GPL-3.0 License - see LICENSE file
 
+---
+
 ## 🙏 Acknowledgments
 
 - Homepage team for excellent dashboard & customapi widget
 - RDAP.org for free RDAP meta-service
+- WhoisXML API for solving ccTLD coverage
 - FastAPI for the awesome Python framework
+
+---
 
 ## 📞 Support
 
