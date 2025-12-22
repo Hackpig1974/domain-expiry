@@ -1,10 +1,10 @@
 services:
   domain-expiry:
-    build: .
+    image: ghcr.io/hackpig1974/domain-expiry:latest
     container_name: domain-expiry
     env_file: .env
     environment:
-      - TZ=${TZ}
+      - TZ=${TZ:-America/Denver}
     ports:
       - "8088:8000"
     restart: unless-stopped
