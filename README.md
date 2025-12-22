@@ -102,9 +102,55 @@ docker compose restart homepage
 | `REFRESH_MINUTES` | No | 360 | Cache duration in minutes (6 hours) |
 | `ALERT_EMOJI` | No | 🔴 | Emoji to show for expiring domains |
 | `TZ` | No | UTC | Timezone (e.g., `America/New_York`) |
-| `WHOIS_FALLBACK_ENABLED` | No | false | Fallback to WHOIS when RDAP fails (for ccTLDs) |
+| `WHOIS_FALLBACK_ENABLED` | No | false | Enable python-whois fallback (works for .uk/.ca/.fr/.io/.ai) |
+| `WHOISXML_API_KEY` | No | - | WhoisXML API key for ALL TLDs including .bz (500 free/month) |
 
-> **Note:** `WHOIS_FALLBACK_ENABLED` is useful for country-code TLDs (ccTLDs) that don't fully support RDAP yet. When enabled, the service will attempt a WHOIS lookup if RDAP fails. WHOIS is slower and being phased out globally, so this is intended as a temporary workaround.
+### 🔄 3-Tier Fallback System
+
+The service uses intelligent fallback to maximize domain coverage:
+
+**Tier 1: RDAP (Default)**
+- ✅ Fast, free, no API key needed
+- ✅ Works for most major TLDs (.com, .net, .org, .io, etc.)
+- ✅ Best option for common domains
+
+**Tier 2: python-whois (Optional)**
+- ⚡ Free, no API key needed
+- ⚡ Enable with `WHOIS_FALLBACK_ENABLED=true`
+- ⚡ Works for: .uk, .ca, .fr, .io, .ai
+- ⚡ Limited TLD support (~41%)
+
+**Tier 3: WhoisXML API (Optional)**
+- 🌍 **Works for ALL 7,500+ TLDs** including .bz, .ai, .de, .au, .nz
+- 🆓 **500 free requests/month** (plenty for homelab use)
+- 🔑 Requires free API key from [WhoisXML API](https://whoisxmlapi.com)
+- 🎯 **Solves ccTLD problems** that RDAP doesn't support yet
+
+**How It Works:**
+1. Try RDAP (Tier 1) first
+2. If RDAP fails and `WHOIS_FALLBACK_ENABLED=true`, try python-whois (Tier 2)
+3. If python-whois fails and `WHOISXML_API_KEY` is set, try WhoisXML API (Tier 3)
+4. If all fail: show "n/a"
+
+**Example Configuration for Maximum Coverage:**
+```bash
+DOMAINS=example.com,gov.bz,mysite.uk
+RDAP_BASE=https://rdap.org/domain
+WHOIS_FALLBACK_ENABLED=true              # Enable Tier 2
+WHOISXML_API_KEY=your-api-key-here        # Enable Tier 3
+ALERT_DAYS=183
+```
+
+With this setup:
+- Common domains (.com, .org) use fast RDAP
+- .uk domains fall back to python-whois (fast, free)
+- .bz domains fall back to WhoisXML API (works but counts against free quota)
+
+**Get WhoisXML API Key:**
+1. Sign up at https://whoisxmlapi.com (free account)
+2. Get 500 free requests/month automatically
+3. Copy your API key from dashboard
+4. Add to `.env` file: `WHOISXML_API_KEY=your-key-here`
 
 ### Example Configurations
 
@@ -235,22 +281,41 @@ widget:
 
 ### "No Expiration in RDAP" Error
 
-Some domains/TLDs don't provide expiration data via RDAP:
+Some domains/TLDs don't provide expiration data via RDAP. The 3-tier fallback system can help!
 
-**Solution: Enable WHOIS Fallback**
-1. Add to your `.env` file:
+**Quick Fix for ccTLDs (like .bz, .nz, .au):**
+
+1. **Get a free WhoisXML API key:**
+   - Sign up at https://whoisxmlapi.com
+   - 500 free requests/month (plenty for homelab)
+   - Copy your API key
+
+2. **Add to `.env`:**
    ```bash
-   WHOIS_FALLBACK_ENABLED=true
+   WHOISXML_API_KEY=your-key-here
    ```
-2. Restart container: `docker compose restart`
-3. Check logs: `docker logs domain-expiry`
 
-This is particularly useful for:
-- Country-code TLDs (ccTLDs) like `.bz`, `.ai`, `.io` that haven't fully adopted RDAP
-- Legacy domains on older registries
-- Domains transitioning to RDAP support
+3. **Restart:**
+   ```bash
+   docker compose restart
+   ```
 
-**Note:** WHOIS lookups are slower and less reliable than RDAP. This is intended as a temporary workaround while global RDAP adoption continues.
+4. **Verify logs:**
+   ```bash
+   docker logs domain-expiry
+   # Should see: "WhoisXML API lookup successful for domain.bz"
+   ```
+
+**Alternative for some TLDs (.uk, .ca, .fr, .io, .ai):**
+```bash
+WHOIS_FALLBACK_ENABLED=true
+```
+This works without an API key but has limited TLD support.
+
+**TLD Support Summary:**
+- ✅ Most TLDs: RDAP (Tier 1, no key needed)
+- ✅ .uk, .ca, .fr, .io, .ai: python-whois (Tier 2, no key needed)
+- ✅ .bz, .nz, .au, .de, .jp and 7,500+ others: WhoisXML API (Tier 3, free key)
 
 ### Homepage Can't Connect
 
