@@ -46,7 +46,7 @@ curl -O https://raw.githubusercontent.com/Hackpig1974/domain-expiry/main/domain-
 
 **Step 3: Pull the Docker Image**
 ```bash
-docker pull ghcr.io/hackpig1974/domain-expiry:latest
+docker compose pull
 ```
 
 **Step 4: Create Configuration File**
@@ -66,7 +66,7 @@ Add your configuration:
 DOMAINS=example.com,google.com,github.com
 RDAP_BASE=https://rdap.org/domain
 WHOIS_FALLBACK_ENABLED=false
-WHOISXML_API_KEY=
+WHOISXML_API_KEY=YOUR_API_KEY
 ALERT_DAYS=183
 REFRESH_MINUTES=360
 TZ=America/Denver
