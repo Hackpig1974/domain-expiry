@@ -495,23 +495,6 @@ A: Tested up to 50. More than that, consider multiple instances or longer cache 
 
 ---
 
-## 🗺️ Roadmap
-
-Potential future features (PRs welcome!):
-
-- [ ] Webhook notifications (Discord, Slack, email)
-- [ ] SSL certificate expiry monitoring
-- [ ] DNS record monitoring
-- [ ] Historical data/trends
-- [ ] Web UI for configuration
-- [ ] Multiple RDAP provider support
-- [ ] Prometheus metrics export
-- [ ] Persistent cache across restarts
-- [ ] Auto-renewal reminders
-- [ ] Import domains from file
-
----
-
 ## 🤝 Contributing
 
 Contributions welcome! Ideas:
