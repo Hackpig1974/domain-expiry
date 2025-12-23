@@ -365,36 +365,6 @@ REFRESH_MINUTES=720  # 12 hours
 
 ---
 
-## 📡 API Endpoints
-
-### `GET /status`
-
-Returns full domain information with metadata.
-
-**Query Parameters:**
-- `force=true` - Force refresh cache
-
-**Response:**
-```json
-{
-  "updated": "2024-12-21T16:30:00Z",
-  "domains": [
-    {
-      "domain": "example.com",
-      "expires": "2025-06-15T00:00:00Z",
-      "expires_us": "06/15/2025",
-      "days_left": 176,
-      "label": "06/15/2025 (176d)",
-      "alert": false,
-      "source": "rdap"
-    }
-  ],
-  "refresh_minutes": 360,
-  "alert_days": 183,
-  "rdap_base": "https://rdap.org/domain"
-}
-```
-
 ### `GET /flat`
 
 Returns simplified text-based format.
