@@ -365,32 +365,6 @@ REFRESH_MINUTES=720  # 12 hours
 
 ---
 
-### `GET /flat`
-
-Returns simplified text-based format.
-
-**Response:**
-```json
-{
-  "line1": "example.com — Exp: 06/15/2025 (176d)",
-  "line2": "🔴 urgent.com — Exp: 🔴 01/10/2025 (20d)",
-  "updated": "2024-12-21T16:30:00Z"
-}
-```
-
-### `GET /healthz`
-
-Health check endpoint for monitoring.
-
-**Response:**
-```json
-{
-  "ok": true
-}
-```
-
----
-
 ## 🔧 Troubleshooting
 
 ### Widget Shows "Error" or "N/A"
